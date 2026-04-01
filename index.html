@@ -20,10 +20,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--i
 
 /* HEADER */
 nav { height: 65px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 1.5rem; z-index: 1000; }
-.logo { display: flex; align-items: center; gap: 10px; font-family: 'DM Serif Display', serif; font-size: 1.2rem; }
+.logo { display: flex; align-items: center; gap: 10px; font-family: 'DM Serif Display', serif; }
 .logo-box { background: var(--terra); color: #fff; padding: 4px 8px; border-radius: 4px; }
 
-/* MAPA */
+/* LAYOUT */
 .main-layout { display: flex; flex: 1; position: relative; overflow: hidden; }
 #map { flex: 1; z-index: 1; }
 
@@ -32,12 +32,13 @@ nav { height: 65px; background: var(--surface); border-bottom: 1px solid var(--b
   width: 420px; background: var(--surface); border-left: 1px solid var(--border); 
   padding: 2rem; overflow-y: auto; transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); z-index: 2000;
 }
-.btn-close { display: none; background: #eee; border: none; padding: 8px 15px; border-radius: 20px; font-weight: 700; cursor: pointer; margin-bottom: 20px; }
+.btn-close-container { display: none; margin-bottom: 20px; text-align: right; }
+.btn-close { background: var(--bg); border: 1px solid var(--border); padding: 8px 20px; border-radius: 20px; font-weight: 700; cursor: pointer; }
 
 @media (max-width: 768px) {
-  .sidebar { position: absolute; bottom: 0; left: 0; width: 100%; height: 70%; transform: translateY(100%); border-radius: 24px 24px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,0.1); }
+  .sidebar { position: absolute; bottom: 0; left: 0; width: 100%; height: 75%; transform: translateY(100%); border-radius: 24px 24px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,0.1); border-left: none; }
   .sidebar.active { transform: translateY(0); }
-  .btn-close { display: block; }
+  .btn-close-container { display: block; }
 }
 
 /* CARDS */
@@ -46,46 +47,37 @@ nav { height: 65px; background: var(--surface); border-bottom: 1px solid var(--b
 .kpi-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #777; margin-bottom: 5px; }
 .kpi-value { font-size: 1.4rem; font-weight: 700; }
 
-#historyChart { width: 100%; height: 220px; margin-top: 20px; }
+#chart-container { height: 250px; margin-top: 20px; }
 </style>
 </head>
 <body>
 
 <nav>
-  <div class="logo">
-    <div class="logo-box">FF</div>
-    <span>FORTALEZA EM FLUXO</span>
-  </div>
-  <div id="status" style="font-size: 11px; font-weight: 600; color: var(--terra);">SINCRO: JUNHO/2025</div>
+  <div class="logo"><div class="logo-box">FF</div><span>FORTALEZA EM FLUXO</span></div>
+  <div style="font-size: 10px; color: var(--terra); font-weight: 700;">ATLAS DO TRÁFEGO v4.0</div>
 </nav>
 
 <div class="main-layout">
   <div id="map"></div>
   
   <aside class="sidebar" id="sidebar">
-    <button class="btn-close" onclick="toggleSidebar(false)">FECHAR</button>
+    <div class="btn-close-container"><button class="btn-close" onclick="toggleSidebar(false)">FECHAR</button></div>
     
     <div id="intro">
       <h2 style="font-family:'DM Serif Display'; font-size: 2rem; margin-bottom: 10px;">Atlas Volumétrico</h2>
-      <p style="color: #666; line-height: 1.6;">O mapa de calor destaca as zonas de maior pressão de tráfego. Selecione um sensor para analisar o comportamento dos últimos 12 meses.</p>
+      <p style="color: #666; line-height: 1.6; font-size: 0.9rem;">Analise a pulsação urbana através dos sensores de tráfego. O heatmap indica zonas de maior saturação.</p>
     </div>
 
     <div id="data-pane" style="display:none">
-      <h2 id="view-via" style="font-family:'DM Serif Display'; font-size: 1.8rem; line-height: 1.1; margin-bottom: 10px;"></h2>
-      <p id="view-sitio" style="font-size: 11px; color: #888; margin-bottom: 20px;"></p>
+      <h2 id="view-via" style="font-family:'DM Serif Display'; font-size: 1.6rem; line-height: 1.1; margin-bottom: 5px;"></h2>
+      <p id="view-sitio" style="font-size: 10px; color: #aaa; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 15px;"></p>
 
       <div class="kpi-grid">
-        <div class="kpi-card">
-          <div class="kpi-label">Volume Atual</div>
-          <div class="kpi-value" id="view-vmd"></div>
-        </div>
-        <div class="kpi-card" style="border-bottom-color: var(--verde);">
-          <div class="kpi-label">Média Anual</div>
-          <div class="kpi-value" id="view-avg"></div>
-        </div>
+        <div class="kpi-card"><div class="kpi-label">VMD Atual</div><div class="kpi-value" id="view-vmd"></div></div>
+        <div class="kpi-card" style="border-bottom-color: var(--verde);"><div class="kpi-label">Média 12 Meses</div><div class="kpi-value" id="view-avg"></div></div>
       </div>
 
-      <div style="height: 250px;"><canvas id="historyChart"></canvas></div>
+      <div id="chart-container"><canvas id="historyChart"></canvas></div>
     </div>
   </aside>
 </div>
@@ -97,32 +89,27 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').ad
 
 let chart = null;
 let allData = [];
-let heatLayer = null;
 
-// CARREGAR CSV
+// CARREGAR DADOS
 Papa.parse('dadosabertos_volumetrafegomensal.csv', {
   download: true, header: true, dynamicTyping: true,
   complete: function(results) {
     allData = results.data.filter(d => d.Lat && d.Lon);
-    initMap();
+    initApp();
   }
 });
 
-function initMap() {
+function initApp() {
   const currentMonth = allData.filter(d => d.DATA === '2025-06');
   
-  // 1. CRIAR MAPA DE CALOR
-  // Formato: [lat, lon, intensidade]
-  const heatPoints = currentMonth.map(p => [p.Lat, p.Lon, p.VMD / 5000]); 
-  heatLayer = L.heatLayer(heatPoints, {
-    radius: 25, blur: 15, maxZoom: 17,
-    gradient: {0.4: 'blue', 0.6: 'lime', 0.8: 'yellow', 1: 'red'}
-  }).addTo(map);
+  // 1. HEATMAP (DENSIDADE)
+  const heatPoints = currentMonth.map(p => [p.Lat, p.Lon, p.VMD / 4000]);
+  L.heatLayer(heatPoints, { radius: 25, blur: 15, maxZoom: 17 }).addTo(map);
 
-  // 2. CRIAR PONTOS INTERATIVOS
+  // 2. MARCADORES INTERATIVOS
   currentMonth.forEach(p => {
     const marker = L.circleMarker([p.Lat, p.Lon], {
-      radius: 6, color: '#fff', weight: 1, fillColor: 'transparent', fillOpacity: 0
+      radius: 8, color: '#fff', weight: 2, fillColor: p.VMD > 40000 ? '#c2410c' : '#d97706', fillOpacity: 0.9
     }).addTo(map);
 
     marker.on('click', () => showDetails(p));
@@ -136,28 +123,24 @@ function showDetails(p) {
   document.getElementById('intro').style.display = 'none';
   document.getElementById('data-pane').style.display = 'block';
   document.getElementById('view-via').innerText = p.ViaSentido.split('[')[0];
-  document.getElementById('view-sitio').innerText = `SÍTIO DE MONITORIZAÇÃO: ${p.Sitio}`;
+  document.getElementById('view-sitio').innerText = `SÍTIO: ${p.Sitio} | REF: JUNHO 2025`;
   document.getElementById('view-vmd').innerText = p.VMD.toLocaleString();
   document.getElementById('view-avg').innerText = Math.round(avg).toLocaleString();
 
-  if(window.innerWidth < 768) toggleSidebar(true);
+  if(window.innerWidth <= 768) toggleSidebar(true);
   renderChart(history);
 }
 
 function renderChart(history) {
   const ctx = document.getElementById('historyChart').getContext('2d');
   if(chart) chart.destroy();
-  
   chart = new Chart(ctx, {
     type: 'line',
     data: {
       labels: history.map(h => h.DATA),
       datasets: [{
-        label: 'VMD Mensal',
-        data: history.map(h => h.VMD),
-        borderColor: '#c2410c',
-        backgroundColor: 'rgba(194, 65, 12, 0.1)',
-        fill: true, tension: 0.3, pointRadius: 4
+        label: 'VMD Histórico', data: history.map(h => h.VMD),
+        borderColor: '#c2410c', backgroundColor: 'rgba(194, 65, 12, 0.1)', fill: true, tension: 0.3
       }]
     },
     options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
