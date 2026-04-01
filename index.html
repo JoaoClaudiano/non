@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Fortaleza em Fluxo — Atlas do Tráfego</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+<style>
+:root {
+  --bg: #f3f0e8; --surface: #fdfcf7; --surface-glass: rgba(253, 252, 247, 0.85);
+  --border: rgba(50, 40, 20, 0.12); --ink: #18140c; --ink-mid: #5a4e38;
+  --terra-main: #c2410c; --terra-faint: #ffedd5;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--ink); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+/* HEADER */
+nav { display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; height: 65px; background: var(--surface); border-bottom: 1px solid var(--border); z-index: 1000; }
+.nav-brand { display: flex; align-items: center; gap: 12px; }
+.nav-mark { width: 36px; height: 36px; background: var(--terra-main); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--surface); font-family: 'DM Serif Display', serif; }
+
+/* LAYOUT PRINCIPAL */
+.app-container { display: grid; grid-template-columns: 1fr 380px; flex: 1; overflow: hidden; }
+#map { height: 100%; width: 100%; background: #e5e2d9; }
+
+/* PAINEL LATERAL */
+.sidebar { background: var(--surface); border-left: 1px solid var(--border); padding: 2rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1.5rem; }
+.kpi-card { padding: 1.2rem; background: var(--bg); border-radius: 12px; border-left: 4px solid var(--terra-main); }
+.kpi-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--ink-mid); letter-spacing: 0.1em; }
+.kpi-value { font-size: 1.6rem; font-weight: 700; margin: 4px 0; }
+
+.status-bar { font-size: 11px; padding: 10px 2rem; background: var(--surface); border-top: 1px solid var(--border); color: var(--ink-mid); }
+
+/* CLUSTERS/DOTS CUSTOM */
+.pulse { width: 10px; height: 10px; background: var(--terra-main); border-radius: 50%; display: inline-block; animation: pulse 2s infinite; }
+@keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(3); opacity: 0; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">
+    <div class="nav-mark">FF</div>
+    <div class="nav-title" style="font-weight: 700;">FORTALEZA EM FLUXO <span style="font-weight: 300; margin-left: 10px; color: var(--ink-mid);">Atlas do Tráfego</span></div>
+  </div>
+  <div style="font-size: 12px; color: var(--terra-main); font-weight: 700;">DADOS ABERTOS AMC</div>
+</nav>
+
+<div class="app-container">
+  <div id="map"></div>
+  
+  <aside class="sidebar">
+    <div id="panel-empty">
+      <h2 style="font-family:'DM Serif Display',serif; margin-bottom: 10px;">Análise Volumétrica</h2>
+      <p style="font-size: 0.9rem; line-height: 1.6; color: var(--ink-mid);">Aguardando seleção de um sensor na malha urbana de Fortaleza...</p>
+    </div>
+
+    <div id="panel-data" style="display: none;">
+      <div id="val-via" style="font-family:'DM Serif Display',serif; font-size: 1.8rem; line-height: 1.1; margin-bottom: 20px;"></div>
+      
+      <div class="kpi-card">
+        <div class="kpi-label">Volume Médio Diário (VMD)</div>
+        <div class="kpi-value" id="val-vmd"></div>
+        <div style="font-size: 0.8rem; color: var(--ink-mid);" id="val-data"></div>
+      </div>
+
+      <div class="kpi-card" style="border-left-color: var(--ink);">
+        <div class="kpi-label">Código do Sítio</div>
+        <div class="kpi-value" id="val-sitio" style="font-size: 1.2rem;"></div>
+      </div>
+
+      <div id="eco-insight" style="font-size: 0.85rem; padding: 15px; background: var(--terra-faint); border-radius: 8px; border: 1px solid var(--terra-bdr);">
+        <strong>Insight de Carbono:</strong> Este fluxo representa uma emissão operacional estimada de <span id="val-co2"></span> kg de CO₂ por hora neste trecho.
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div class="status-bar" id="status-bar">Carregando dados volumétricos de Fortaleza...</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let map = L.map('map', { zoomControl: false }).setView([-3.76, -38.51], 12);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+// Função para processar o CSV que você forneceu
+function carregarDados() {
+  const csvUrl = 'dadosabertos_volumetrafegomensal.csv'; // Certifique-se de que o arquivo está na mesma pasta
+
+  Papa.parse(csvUrl, {
+    download: true,
+    header: true,
+    dynamicTyping: true,
+    complete: function(results) {
+      const dadosPlanilha = results.data;
+      // Filtrar apenas os dados mais recentes (2025-06) para não sobrecarregar o mapa
+      const dadosRecentes = dadosPlanilha.filter(d => d.DATA === '2025-06');
+      
+      plotarPontos(dadosRecentes);
+      document.getElementById('status-bar').innerText = `Mapa atualizado com ${dadosRecentes.length} pontos de monitoramento ativos (Junho/2025).`;
+    },
+    error: function(err) {
+      document.getElementById('status-bar').innerText = "Erro ao carregar planilha. Certifique-se de que o arquivo CSV está no servidor local.";
+    }
+  });
+}
+
+function plotarPontos(pontos) {
+  pontos.forEach(p => {
+    if (!p.Lat || !p.Lon) return;
+
+    // A cor do ponto muda conforme o volume (Engenharia de Tráfego)
+    let cor = '#65a30d'; // Fluxo Baixo
+    if (p.VMD > 20000) cor = '#d97706'; // Fluxo Médio
+    if (p.VMD > 40000) cor = '#c2410c'; // Fluxo Alto
+
+    const marker = L.circleMarker([p.Lat, p.Lon], {
+      radius: 6,
+      fillColor: cor,
+      color: '#fff',
+      weight: 1,
+      fillOpacity: 0.8
+    }).addTo(map);
+
+    marker.on('click', () => {
+      document.getElementById('panel-empty').style.display = 'none';
+      document.getElementById('panel-data').style.display = 'block';
+      
+      document.getElementById('val-via').innerText = p.ViaSentido;
+      document.getElementById('val-vmd').innerText = p.VMD.toLocaleString();
+      document.getElementById('val-data').innerText = `Referência: ${p.DATA}`;
+      document.getElementById('val-sitio').innerText = p.Sitio;
+      
+      // Cálculo de CO2 operacional (Média de 40g/min por carro em baixa velocidade)
+      const co2Hora = (p.VMD / 24 * 0.15).toFixed(1); 
+      document.getElementById('val-co2').innerText = co2Hora;
+    });
+  });
+}
+
+// Iniciar carregamento
+carregarDados();
+</script>
+</body>
+</html>
